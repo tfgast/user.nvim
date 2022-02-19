@@ -110,16 +110,6 @@ function PackMan:request(pack)
   if pack.init then pack.init() end
 
   local install_path = pack.name
-  if pack.branch then
-    install_path = install_path.."/branch/"..pack.branch
-  else
-    install_path = install_path.."/default/default"
-  end
-  if pack.pin then
-    install_path = install_path.."/commit/"..pack.pin
-  else
-    install_path = install_path.."/default/default"
-  end
 
   local packadd_path = install_path
   if pack.subdir then packadd_path = packadd_path.."/"..pack.subdir end
