@@ -9,13 +9,7 @@ local function git_head_hash(pack)
 end
 
 local function packadd(pack)
-  vim.api.nvim_command("packadd "..vim.fn.fnameescape(pack.packadd_path))
-  -- work around vim#1994
-  if vim.v.vim_did_enter == 1 then
-    for after_source in vim.fn.glob(pack.install_path.."/after/plugin/**/*.vim"):gmatch("[^\n]+") do
-      vim.api.nvim_command("source "..vim.fn.fnameescape(after_source))
-    end
-  end
+  vim.api.nvim_command("packadd! "..vim.fn.fnameescape(pack.packadd_path))
 end
 
 local function chdir_do_fun(dir, fun)
