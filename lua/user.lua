@@ -6,62 +6,62 @@ local packman
 -- requesting an runtimepath edit.
 --]]
 local function use(args)
-  local pack = {}
+    local pack = {}
 
-  if type(args) == "string" then
-    pack.name = args
-  elseif type(args) == "table" then
-    if args.disabled then
-      return
+    if type(args) == "string" then
+        pack.name = args
+    elseif type(args) == "table" then
+        if args.disabled then
+            return
+        end
+
+        pack.name = args[1]
+
+        pack.repo = args.repo
+        pack.branch = args.branch
+        pack.pin = args.pin
+
+        pack.subdir = args.subdir
+
+        pack.init = args.init
+        pack.config = args.config
+
+        pack.install = args.install
+        pack.update = args.update
+
+        pack.after = args.after
+    else
+        error("user.use -- invalid args")
     end
 
-    pack.name = args[1]
+    if packman.packs[pack.name] then
+        return packman.packs[pack.name]
+    end
 
-    pack.repo = args.repo
-    pack.branch = args.branch
-    pack.pin = args.pin
+    -- we have a repo that can be managed by packman
+    if pack.repo or string.match(pack.name, "^[^/]+/[^/]+$") then
+        pack.repo = pack.repo or "https://github.com/"..pack.name..".git"
+        return packman:request(pack)
+    end
 
-    pack.subdir = args.subdir
-
-    pack.init = args.init
-    pack.config = args.config
-
-    pack.install = args.install
-    pack.update = args.update
-
-    pack.after = args.after
-  else
-    error("user.use -- invalid args")
-  end
-
-  if packman.packs[pack.name] then
-    return packman.packs[pack.name]
-  end
-
-  -- we have a repo that can be managed by packman
-  if pack.repo or string.match(pack.name, "^[^/]+/[^/]+$") then
-    pack.repo = pack.repo or "https://github.com/"..pack.name..".git"
-    return packman:request(pack)
-  end
-
-  -- we can install local directories too!
-  local path = vim.fn.fnamemodify(pack.name, ":p")
-  if vim.fn.isdirectory(path) then
-    vim.opt.runtimepath:prepend(path)
-  else
-    error("user.user -- invalid args")
-  end
-  return pack
+    -- we can install local directories too!
+    local path = vim.fn.fnamemodify(pack.name, ":p")
+    if vim.fn.isdirectory(path) then
+        vim.opt.runtimepath:prepend(path)
+    else
+        error("user.user -- invalid args")
+    end
+    return pack
 end
 
 --[[
 -- instantiate everything
 --]]
 local function setup(args)
-  if args and args.path then
-    args.path = vim.fn.expand(args.path)
-  end
-  packman = require("user.packman").PackMan:new(args)
+    if args and args.path then
+        args.path = vim.fn.expand(args.path)
+    end
+    packman = require("user.packman").PackMan:new(args)
 end
 
 --[[
@@ -69,10 +69,10 @@ end
 -- does nothing if parallel jobs are not enabled
 --]]
 local function flush()
-  if packman.parallel then
-    packman:flush_jobs()
-    packman:flush_packadd_queue()
-  end
+    if packman.parallel then
+        packman:flush_jobs()
+        packman:flush_packadd_queue()
+    end
 end
 
 --[[
@@ -80,17 +80,17 @@ end
 -- awaits parallel git pull jobs if enabled
 --]]
 local function update()
-  packman:update_all()
-  if packman.parallel then
-    packman:flush_jobs()
-  end
+    packman:update_all()
+    if packman.parallel then
+        packman:flush_jobs()
+    end
 end
 
 return {
-  setup = setup,
-  update = update,
-  use = use,
+    setup = setup,
+    update = update,
+    use = use,
 
-  flush = flush,
-  startup = flush,
+    flush = flush,
+    startup = flush,
 }
