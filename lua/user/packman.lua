@@ -20,10 +20,6 @@ local function chdir_do_fun(dir, fun)
 end
 
 local function post_install(pack)
-    if pack.pin then
-        local escaped_install_path = vim.fn.shellescape(pack.install_path)
-        os.execute("git -C "..escaped_install_path.." checkout --quiet "..pack.pin)
-    end
     gen_helptags(pack)
     if pack.install then
         chdir_do_fun(pack.install_path, pack.install)
@@ -66,14 +62,6 @@ function PackMan:install(pack)
 
     local command = "git clone --quiet --recurse-submodules --shallow-submodules "
 
-    if not pack.pin then
-        command = command.."--depth 1 "
-    end
-
-    if pack.branch then
-        command = command.."--branch "..vim.fn.shellescape(pack.branch).." "
-    end
-
     local escaped_install_path = vim.fn.shellescape(pack.install_path)
     command = command..vim.fn.shellescape(pack.repo).." "..escaped_install_path
 
@@ -86,18 +74,16 @@ function PackMan:install(pack)
 end
 
 function PackMan:update(pack)
-    if not pack.pin then
-        pack.hash = git_head_hash(pack)
+    pack.hash = git_head_hash(pack)
 
-        local escaped_install_path = vim.fn.shellescape(pack.install_path)
-        local command = "git -C "..escaped_install_path.." pull --quiet --recurse-submodules --update-shallow"
+    local escaped_install_path = vim.fn.shellescape(pack.install_path)
+    local command = "git -C "..escaped_install_path.." pull --quiet --recurse-submodules --update-shallow"
 
-        if self.parallel then
-            pack.update_job = io.popen(command, "r")
-        else
-            os.execute(command)
-            post_update(pack)
-        end
+    if self.parallel then
+        pack.update_job = io.popen(command, "r")
+    else
+        os.execute(command)
+        post_update(pack)
     end
 end
 
