@@ -1,3 +1,4 @@
+local Job = require"user.job"
 local Deque = require("user.deque").Deque
 
 local function gen_helptags(pack)
@@ -46,9 +47,12 @@ function PackMan:new(args)
 
         packs = {},
 
-        packadd_queue = Deque:new(),
+        config_queue = Deque:new(),
 
-        parallel = args.parallel or false,
+        jobs = {},
+
+	errs = {},
+
     }
     self.__index = self
     setmetatable(packman, self)
@@ -57,34 +61,42 @@ end
 
 function PackMan:install(pack)
     if vim.fn.isdirectory(pack.install_path) == 1 then
+        packadd(pack)
         return
     end
 
-    local command = "git clone --quiet --recurse-submodules --shallow-submodules "
-
-    local escaped_install_path = vim.fn.shellescape(pack.install_path)
-    command = command..vim.fn.shellescape(pack.repo).." "..escaped_install_path
-
-    if self.parallel then
-        pack.install_job = io.popen(command, "r")
-    else
-        os.execute(command)
-        post_install(pack)
-    end
+    local job = Job:new({
+        command = 'git',
+        args = { 'clone', '--quiet', '--recurse-submodules', '--shallow-submodules',
+            pack.repo, pack.install_path},
+        on_exit = function(j, return_val)
+            if return_val ~= 0 then
+                table.insert(self.errs, j:stderr_result())
+            else
+                post_install(pack)
+                packadd(pack)
+            end
+        end,
+    })
+    job:start()
+    table.insert(self.jobs, job)
 end
 
 function PackMan:update(pack)
     pack.hash = git_head_hash(pack)
 
-    local escaped_install_path = vim.fn.shellescape(pack.install_path)
-    local command = "git -C "..escaped_install_path.." pull --quiet --recurse-submodules --update-shallow"
-
-    if self.parallel then
-        pack.update_job = io.popen(command, "r")
-    else
-        os.execute(command)
-        post_update(pack)
-    end
+    local job = Job:new({
+        command = 'git',
+        args = { '-C', pack.install_path, 'pull', '--quiet', '--recurse-submodules', '--update-shallow'},
+        on_exit = function(j, return_val)
+            if return_val ~= 0 then
+                table.insert(self.errs, j:stderr_result())
+            else
+                post_update(pack)
+            end
+        end,
+    })
+    table.insert(self.jobs, job)
 end
 
 function PackMan:request(pack)
@@ -104,37 +116,25 @@ function PackMan:request(pack)
     pack.install_path = self.path.."/opt/"..install_path
 
     self:install(pack)
-    if self.parallel then
-        self.packadd_queue:push_back(pack)
-    else
-        post_install(pack)
-        packadd(pack)
-        if pack.config then pack.config() end
+    if pack.config then
+        self.config_queue:push_back(pack.config)
     end
 
     return pack
 end
 
 function PackMan:flush_jobs()
-    for _, pack in pairs(self.packs) do
-        if pack.install_job then
-            pack.install_job:close()
-            pack.install_job = nil
-            post_install(pack)
-        end
-        if pack.update_job then
-            pack.update_job:close()
-            pack.update_job = nil
-            post_update(pack)
-        end
+    Job.join(unpack(self.jobs))
+    for _, err in ipairs(self.errs) do
+        vim.notify(table.concat(err,"\n"), vim.log.levels.ERROR)
     end
+    self.errs = {}
 end
 
-function PackMan:flush_packadd_queue()
-    while self.packadd_queue:len() > 0 do
-        local pack = self.packadd_queue:pop_front()
-        packadd(pack)
-        if pack.config then pack.config() end
+function PackMan:flush_config_queue()
+    while self.config_queue:len() > 0 do
+        local config = self.config_queue:pop_front()
+        config()
     end
 end
 

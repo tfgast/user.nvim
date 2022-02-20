@@ -40,7 +40,7 @@ local function use(args)
 
     -- we have a repo that can be managed by packman
     if pack.repo or string.match(pack.name, "^[^/]+/[^/]+$") then
-        pack.repo = pack.repo or "https://github.com/"..pack.name..".git"
+        pack.repo = pack.repo or ("https://github.com/"..pack.name..".git")
         return packman:request(pack)
     end
 
@@ -65,25 +65,18 @@ local function setup(args)
 end
 
 --[[
--- flush parallel git clone jobs
--- does nothing if parallel jobs are not enabled
+-- flush git clone jobs
 --]]
 local function flush()
-    if packman.parallel then
-        packman:flush_jobs()
-        packman:flush_packadd_queue()
-    end
+    packman:flush_jobs()
+    packman:flush_config_queue()
 end
 
 --[[
 -- updates packages
--- awaits parallel git pull jobs if enabled
 --]]
 local function update()
     packman:update_all()
-    if packman.parallel then
-        packman:flush_jobs()
-    end
 end
 
 return {
