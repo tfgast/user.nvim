@@ -16,11 +16,15 @@ end
 local function chdir_do_fun(dir, fun)
     local cwd = vim.loop.cwd()
     vim.loop.chdir(dir)
-    pcall(fun)
+    local succeeded, res = pcall(fun)
+    if not succeeded then
+        vim.notify(res, vim.log.levels.ERROR)
+    end
     vim.loop.chdir(cwd)
 end
 
 local function post_install(pack)
+    vim.notify("installed "..pack.name, vim.log.levels.INFO)
     gen_helptags(pack)
     if pack.install then
         chdir_do_fun(pack.install_path, pack.install)
@@ -30,6 +34,7 @@ end
 local function post_update(pack)
     local hash = git_head_hash(pack)
     if pack.hash and pack.hash ~= hash then
+        vim.notify("updated "..pack.name, vim.log.levels.INFO)
         gen_helptags(pack)
         if pack.update then
             chdir_do_fun(pack.install_path, pack.update)
@@ -51,8 +56,6 @@ function PackMan:new(args)
 
         jobs = {},
 
-	errs = {},
-
     }
     self.__index = self
     setmetatable(packman, self)
@@ -69,14 +72,14 @@ function PackMan:install(pack)
         command = 'git',
         args = { 'clone', '--quiet', '--recurse-submodules', '--shallow-submodules',
             pack.repo, pack.install_path},
-        on_exit = function(j, return_val)
+        on_exit = vim.schedule_wrap(function(j, return_val)
             if return_val ~= 0 then
-                table.insert(self.errs, j:stderr_result())
+                vim.notify(table.concat(j:stderr_result(),"\n"), vim.log.levels.ERROR)
             else
                 post_install(pack)
                 packadd(pack)
             end
-        end,
+        end),
     })
     job:start()
     table.insert(self.jobs, job)
@@ -88,14 +91,15 @@ function PackMan:update(pack)
     local job = Job:new({
         command = 'git',
         args = { '-C', pack.install_path, 'pull', '--quiet', '--recurse-submodules', '--update-shallow'},
-        on_exit = function(j, return_val)
+        on_exit = vim.schedule_wrap(function(j, return_val)
             if return_val ~= 0 then
-                table.insert(self.errs, j:stderr_result())
+                vim.notify(table.concat(j:stderr_result(),"\n"), vim.log.levels.ERROR)
             else
                 post_update(pack)
             end
-        end,
+        end),
     })
+    job:start()
     table.insert(self.jobs, job)
 end
 
@@ -125,16 +129,15 @@ end
 
 function PackMan:flush_jobs()
     Job.join(unpack(self.jobs))
-    for _, err in ipairs(self.errs) do
-        vim.notify(table.concat(err,"\n"), vim.log.levels.ERROR)
-    end
-    self.errs = {}
 end
 
 function PackMan:flush_config_queue()
     while self.config_queue:len() > 0 do
         local config = self.config_queue:pop_front()
-        config()
+        local succeeded, res = pcall(config)
+        if not succeeded then
+            vim.notify(res, vim.log.levels.ERROR)
+        end
     end
 end
 
