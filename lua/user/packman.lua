@@ -34,7 +34,8 @@ end
 local function post_update(pack)
     local hash = git_head_hash(pack)
     if pack.hash and pack.hash ~= hash then
-        vim.notify("updated "..pack.name, vim.log.levels.INFO)
+        local msg = vim.fn.system([[git -C "]]..pack.install_path..[[" log --pretty=format:"%s" ORIG_HEAD..]])
+        vim.notify("updated "..pack.name.."\n"..msg, vim.log.levels.INFO)
         gen_helptags(pack)
         if pack.update then
             chdir_do_fun(pack.install_path, pack.update)
@@ -67,6 +68,7 @@ function PackMan:install(pack)
         packadd(pack)
         return
     end
+    vim.notify("installing "..pack.name, vim.log.levels.INFO)
 
     local job = Job:new({
         command = 'git',
@@ -90,10 +92,11 @@ function PackMan:update(pack)
 
     local job = Job:new({
         command = 'git',
-        args = { '-C', pack.install_path, 'pull', '--quiet', '--recurse-submodules', '--update-shallow'},
+        args = { '-C', pack.install_path, 'pull', '--recurse-submodules', '--update-shallow'},
         on_exit = vim.schedule_wrap(function(j, return_val)
             if return_val ~= 0 then
-                vim.notify(table.concat(j:stderr_result(),"\n"), vim.log.levels.ERROR)
+                local err_msg = table.concat(j:stderr_result(),"\n")
+                vim.notify("updating "..pack.name.."\n"..err_msg, vim.log.levels.ERROR)
             else
                 post_update(pack)
             end
