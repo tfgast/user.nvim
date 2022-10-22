@@ -31,7 +31,7 @@ local function use(args)
 
         pack.after = args.after
     else
-        error("user.use -- invalid args")
+        error "user.use -- invalid args"
     end
 
     if packman.packs[pack.name] then
@@ -44,12 +44,12 @@ local function use(args)
         return packman:request(pack)
     end
 
-    -- we can install local directories too!
+    -- we can "install" local directories too!
     local path = vim.fn.fnamemodify(pack.name, ":p")
     if vim.fn.isdirectory(path) then
         vim.opt.runtimepath:prepend(path)
     else
-        error("user.user -- invalid args")
+        error "user.user -- invalid args"
     end
     return pack
 end
@@ -79,11 +79,20 @@ local function update()
     packman:update_all()
 end
 
+--[[
+-- clean out packages
+--]]
+local function clean()
+    packman:clean()
+end
+
 return {
     setup = setup,
-    update = update,
     use = use,
-
     flush = flush,
+
+    update = update,
+    clean = clean,
+
     startup = flush,
 }

@@ -2,15 +2,15 @@ local Job = require"user.job"
 local Deque = require("user.deque").Deque
 
 local function gen_helptags(pack)
-    vim.api.nvim_command("silent! helptags "..vim.fn.fnameescape(pack.install_path).."/doc")
+    vim.cmd(("silent! helptags %s/doc"):format(vim.fn.fnameescape(pack.install_path)))
 end
 
 local function git_head_hash(pack)
-    return vim.fn.system([[git -C "]]..pack.install_path..[[" rev-parse HEAD]])
+    return vim.fn.system { "git", "-C", pack.install_path, "rev-parse", "HEAD" }
 end
 
 local function packadd(pack)
-    vim.api.nvim_command("packadd! "..vim.fn.fnameescape(pack.packadd_path))
+    vim.cmd(("packadd %s"):format(vim.fn.fnameescape(pack.packadd_path)))
 end
 
 local function chdir_do_fun(dir, fun)
@@ -49,7 +49,8 @@ local PackMan = {}
 function PackMan:new(args)
     args = args or {}
     local packman = {
-        path = (args.path and vim.fn.resolve(vim.fn.fnamemodify(args.path, ":p"))) or vim.fn.stdpath("data").."/site/pack/user/",
+        path = (args.path and vim.fn.resolve(vim.fn.fnamemodify(args.path, ":p")))
+            or (vim.fn.stdpath "data").."/site/pack/user/",
 
         packs = {},
 
@@ -147,6 +148,39 @@ end
 function PackMan:update_all()
     for _, pack in pairs(self.packs) do
         self:update(pack)
+    end
+end
+
+function PackMan:clean()
+    local keep = {}
+    for _, pack in pairs(self.packs) do
+        keep[vim.fn.resolve(pack.install_path)] = true
+    end
+
+    for place in vim.fn.glob(vim.fn.stdpath "data" .. "/site/pack/user/opt/*/*/"):gmatch "[^\n]+" do
+        place = vim.fn.resolve(place)
+        if not keep[place] then
+            if vim.fn.confirm("Delete folder " .. place) == 1 then
+                vim.fn.delete(place, "rf")
+            end
+        end
+    end
+
+    for place in vim.fn.glob(vim.fn.stdpath "data" .. "/site/pack/user/opt/*"):gmatch "[^\n]+" do
+        place = vim.fn.resolve(place)
+        local empty = true
+        for file in vim.fn.glob(place .. "/*/**"):gmatch "[^\n]+" do
+            if vim.fn.isdirectory(file) == 0 then
+                empty = false
+                break
+            end
+        end
+
+        if empty then
+            if vim.fn.confirm("Delete folder " .. place) == 1 then
+                vim.fn.delete(place, "rf")
+            end
+        end
     end
 end
 
